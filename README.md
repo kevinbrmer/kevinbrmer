@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/portrait-dark.svg">
-  <img src="assets/portrait-light.svg" align="right" width="34%" alt="Kevin Brammer">
+  <img src="assets/portrait-light.svg" align="right" width="38%" alt="Kevin Brammer">
 </picture>
 
 <picture>

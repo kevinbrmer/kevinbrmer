@@ -50,7 +50,10 @@ CARET_WIDTH = 5.0
 # Schrift nicht mitskaliert.
 README_FONT_TARGET = 40.0
 README_CONTAINER = 895.0
-README_PORTRAIT_W = 0.34
+# Angestrebte Breite der Silhouette im README-Kasten. Wie bei der Headline
+# wird die Breitenangabe daraus abgeleitet, damit ein Rand rechts das Portrait
+# nach links schiebt, ohne es zu verkleinern.
+README_PORTRAIT_TARGET = 304.0
 HEADLINE_PAD_BOTTOM = 26.0
 CARET_GAP = 5.0
 DOT_GAP = 4.0
@@ -67,6 +70,10 @@ PORTRAIT_PAD = 2.0
 # Luft unter dem Rahmen, damit das Portrait im README nicht am unteren Rand
 # des Kastens klebt.
 PORTRAIT_PAD_BOTTOM = 44.0
+# Rand rechts. Das Bild floatet im README nach rechts, dieser Rand schiebt es
+# deshalb nach links in Richtung Mitte. Wert entspricht vier Leerzeichen der
+# Headline-Schrift, damit die Verschiebung zum uebrigen Layout passt.
+PORTRAIT_PAD_RIGHT = 48.0
 
 THEMES = {
     # Marken-Violett aus tokens.css, Kontrast auf hellem Grund rund 5:1
@@ -204,7 +211,7 @@ def _pad_top(font) -> float:
     geometry = portrait_geometry()
     portrait_ratio = geometry["height"] / geometry["width"]
     # Mitte des Portraits, gemessen in Anteilen der Containerbreite
-    portrait_middle = README_PORTRAIT_W * portrait_ratio / 2
+    portrait_middle = readme_portrait_width(geometry) * portrait_ratio / 2
     # dieselbe Hoehe, umgerechnet in Koordinaten der Headline-Grafik
     target = portrait_middle * _headline_width(font) / readme_headline_width(font)
 
@@ -318,9 +325,20 @@ def portrait_geometry() -> dict:
         "frame_x": PORTRAIT_PAD + (portrait_w - FRAME_W) / 2,
         "frame_y": PORTRAIT_PAD + frame_y,
         "floor": PORTRAIT_PAD + frame_y + FRAME_H - FRAME_STROKE / 2,
-        "width": portrait_w + 2 * PORTRAIT_PAD,
+        "width": portrait_w + PORTRAIT_PAD + PORTRAIT_PAD_RIGHT,
         "height": PORTRAIT_PAD + frame_y + FRAME_H + PORTRAIT_PAD_BOTTOM,
     }
+
+
+def readme_portrait_width(geometry: dict | None = None) -> float:
+    """Anteil der Containerbreite, den die Portraitgrafik einnehmen soll.
+
+    Abgeleitet aus der angestrebten Breite der Silhouette, damit ein Rand
+    rechts das Bild nach links schiebt, ohne es kleiner zu machen.
+    """
+    geometry = geometry or portrait_geometry()
+    scale = README_PORTRAIT_TARGET / geometry["portrait_w"]
+    return geometry["width"] * scale / README_CONTAINER
 
 
 def build_portrait_svg(theme_name: str) -> str:
@@ -369,9 +387,11 @@ def main() -> None:
     scale = share * README_CONTAINER / width
     print(
         f"README: Headline width=\"{share * 100:.0f}%\", "
-        f"Abstandhalter der Icon-Reihe {text_x(font) * scale:.0f} px "
-        f"(Schrift {HEADLINE_SIZE * scale:.1f} px)"
+        f"Portrait width=\"{readme_portrait_width(geometry) * 100:.0f}%\", "
+        f"Abstandhalter der Icon-Reihe {text_x(font) * scale:.0f} px"
     )
+    print(f"        Schrift {HEADLINE_SIZE * scale:.1f} px, Silhouette "
+          f"{README_PORTRAIT_TARGET:.0f} px breit")
 
 
 if __name__ == "__main__":
