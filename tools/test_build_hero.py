@@ -2,9 +2,30 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from build_hero import HEIGHT, TOTAL_MS, WIDTH, WORDS, build_svg, caret_track, word_timeline
+from build_hero import (
+    FONT_PATH,
+    FRAME_H,
+    FRAME_STROKE,
+    HEADLINE_LINES,
+    HEADLINE_SIZE,
+    LINE_HEIGHT,
+    THEMES,
+    TOTAL_MS,
+    WORDS,
+    build_headline_svg,
+    build_portrait_svg,
+    caret_track,
+    headline_size,
+    portrait_geometry,
+    word_timeline,
+)
+from glyphs import load_font, text_depth, text_top
 
 NS = "{http://www.w3.org/2000/svg}"
+THEME_NAMES = ["light", "dark"]
+
+
+# --- Zeitachse ---------------------------------------------------------------
 
 
 def test_timeline_total_is_16840_ms():
@@ -23,160 +44,130 @@ def test_timeline_segments_are_contiguous():
 
 
 def test_caret_track_starts_and_ends_at_origin():
-    values, times = caret_track()
-    assert values[0] == 0.0
-    assert values[-1] == 0.0
-    assert times[0] == 0.0
-    assert times[-1] == 1.0
+    points = caret_track(load_font(FONT_PATH))
+    assert points[0] == (0, 0.0)
+    assert points[-1] == (TOTAL_MS, 0.0)
 
 
 def test_caret_track_is_monotonic_in_time():
-    _, times = caret_track()
-    assert all(b >= a for a, b in zip(times, times[1:]))
+    points = caret_track(load_font(FONT_PATH))
+    assert all(b[0] >= a[0] for a, b in zip(points, points[1:]))
 
 
-def test_caret_track_pairs_values_with_times():
-    values, times = caret_track()
-    assert len(values) == len(times)
+# --- Headline-Grafik ---------------------------------------------------------
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_build_svg_is_wellformed_and_sized(theme):
-    root = ET.fromstring(build_svg(theme))
-    assert root.attrib["viewBox"] == f"0 0 {WIDTH} {HEIGHT}"
+@pytest.mark.parametrize("theme", THEME_NAMES)
+def test_headline_is_wellformed_and_labelled(theme):
+    root = ET.fromstring(build_headline_svg(theme))
+    assert root.attrib["role"] == "img"
+    assert "digitalization" in root.attrib["aria-label"]
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_build_svg_animates_every_word(theme):
-    markup = build_svg(theme)
-    assert markup.count("<animate") >= len(WORDS)
+@pytest.mark.parametrize("theme", THEME_NAMES)
+def test_headline_animates_every_word(theme):
+    assert build_headline_svg(theme).count("<animate") >= len(WORDS)
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("theme", THEME_NAMES)
 def test_first_word_stays_visible_without_smil(theme):
     """Ignoriert eine Umgebung SMIL, muss die Rotator-Zeile trotzdem lesbar sein."""
-    root = ET.fromstring(build_svg(theme))
+    root = ET.fromstring(build_headline_svg(theme))
     rect = root.find(f".//{NS}clipPath[@id='reveal0']/{NS}rect")
     assert rect is not None
     assert float(rect.attrib["width"]) > 0
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("theme", THEME_NAMES)
 def test_clipped_groups_carry_no_transform(theme):
     """SVG wendet transform vor clip-path an. Traegt dasselbe Element beides,
     verschiebt sich die Maske mit und schneidet den Text komplett weg."""
-    root = ET.fromstring(build_svg(theme))
+    root = ET.fromstring(build_headline_svg(theme))
     clipped = [g for g in root.iter(f"{NS}g") if "clip-path" in g.attrib]
     assert len(clipped) == len(WORDS)
     for group in clipped:
         assert "transform" not in group.attrib
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("theme", THEME_NAMES)
 def test_rotator_words_use_the_theme_accent(theme):
-    """Die Rotator-Zeile ist einfarbig in der Akzentfarbe des jeweiligen Themes."""
-    from build_hero import THEMES
-
-    root = ET.fromstring(build_svg(theme))
+    root = ET.fromstring(build_headline_svg(theme))
     clipped = [g for g in root.iter(f"{NS}g") if "clip-path" in g.attrib]
-    assert len(clipped) == len(WORDS)
     for group in clipped:
-        inner = group.find(f"{NS}g")
-        assert inner.attrib["fill"] == THEMES[theme]["accent"]
+        assert group.find(f"{NS}g").attrib["fill"] == THEMES[theme]["accent"]
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_build_svg_embeds_portrait(theme):
-    markup = build_svg(theme)
+@pytest.mark.parametrize("theme", THEME_NAMES)
+def test_headline_carries_no_portrait(theme):
+    """Portrait und Headline sind getrennte Dateien, damit im README das Bild
+    nach rechts floaten kann und die Icons direkt unter den Text ruecken."""
+    assert "data:image/png;base64," not in build_headline_svg(theme)
+
+
+@pytest.mark.parametrize("theme", THEME_NAMES)
+def test_headline_box_encloses_all_three_lines(theme):
+    """Keine Zeile darf oben oder unten aus der Zeichenflaeche ragen."""
+    font = load_font(FONT_PATH)
+    width, height, baseline = headline_size(font)
+    assert baseline - text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE) >= 0
+    last = baseline + 2 * LINE_HEIGHT
+    assert last + max(text_depth(font, w, HEADLINE_SIZE) for w in WORDS) <= height
+
+    root = ET.fromstring(build_headline_svg(theme))
+    assert root.attrib["viewBox"] == f"0 0 {width:.0f} {height:.0f}"
+
+
+# --- Portrait-Grafik ---------------------------------------------------------
+
+
+@pytest.mark.parametrize("theme", THEME_NAMES)
+def test_portrait_is_wellformed_and_embeds_the_image(theme):
+    markup = build_portrait_svg(theme)
+    root = ET.fromstring(markup)
+    assert root.attrib["role"] == "img"
     assert "data:image/png;base64," in markup
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_headline_block_is_centered_on_the_portrait(theme):
-    """Die Mitte des Textblocks liegt auf der Mitte des sichtbaren Portraits."""
-    from build_hero import (
-        FONT_PATH,
-        FRAME_H,
-        FRAME_STROKE,
-        FRAME_Y,
-        HEADLINE_LINES,
-        HEADLINE_SIZE,
-        LINE_HEIGHT,
-    )
-    from glyphs import load_font, text_depth, text_top
+@pytest.mark.parametrize("theme", THEME_NAMES)
+def test_portrait_starts_at_the_top_edge(theme):
+    """Der Scheitel sitzt am oberen Bildrand, damit im README kein toter
+    Rand ueber dem Portrait entsteht."""
+    geometry = portrait_geometry()
+    assert geometry["portrait_y"] <= 2.0
 
-    root = ET.fromstring(build_svg(theme))
+
+@pytest.mark.parametrize("theme", THEME_NAMES)
+def test_portrait_is_cut_at_the_frame_floor(theme):
+    """Das Portrait endet an der Innenkante der unteren Rahmenlinie."""
+    geometry = portrait_geometry()
+    root = ET.fromstring(build_portrait_svg(theme))
     image = root.find(f"{NS}image")
-    groups = [g for g in root.findall(f"{NS}g") if "transform" in g.attrib]
-    baseline_y = float(groups[0].attrib["transform"].split()[-1].rstrip(")"))
+    assert image.attrib["clip-path"] == "url(#portraitFloor)"
 
-    font = load_font(FONT_PATH)
-    over = text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
-    under = max(text_depth(font, word, HEADLINE_SIZE) for word in WORDS)
-    block_top = baseline_y - over
-    block_bottom = baseline_y + len(HEADLINE_LINES) * LINE_HEIGHT + under
-
-    portrait_top = float(image.attrib["y"])
-    portrait_bottom = min(
-        portrait_top + float(image.attrib["height"]),
-        FRAME_Y + FRAME_H - FRAME_STROKE / 2,
-    )
-    assert (block_top + block_bottom) / 2 == pytest.approx(
-        (portrait_top + portrait_bottom) / 2, abs=0.5
-    )
+    rect = root.find(f".//{NS}clipPath[@id='portraitFloor']/{NS}rect")
+    expected = geometry["frame_y"] + FRAME_H - FRAME_STROKE / 2
+    assert float(rect.attrib["height"]) == pytest.approx(expected)
+    # Ohne Beschnitt liefe das Bild tiefer, sonst waere der Test blind.
+    assert geometry["portrait_y"] + geometry["portrait_h"] > expected
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_hero_carries_no_icons(theme):
-    """Die Kontakt-Icons gehoeren ins README, nicht ins SVG.
-
-    GitHub bindet das Hero als <img> ein und entfernt darin jeden Verweis.
-    Im SVG waeren die Icons nicht anklickbar und damit sinnlos.
-    """
-    markup = build_svg(theme)
-    for name in ("linkedin", "circle cx", "M7 9h10"):
-        assert name not in markup
-
-
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_svg_stays_transparent(theme):
-    """Kein gefuelltes Hintergrundrechteck, damit GitHubs Seitenton durchscheint."""
-    root = ET.fromstring(build_svg(theme))
-    full_width = [
-        rect
-        for rect in root.findall(f"{NS}rect")
-        if rect.attrib.get("width") == str(WIDTH)
-    ]
-    assert full_width == []
-
-
-@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("theme", THEME_NAMES)
 def test_frame_is_outline_only(theme):
-    """Der Rahmen ist eine reine Kontur, seine Flaeche bleibt durchsichtig."""
-    root = ET.fromstring(build_svg(theme))
+    root = ET.fromstring(build_portrait_svg(theme))
     frames = [r for r in root.findall(f"{NS}rect") if "stroke" in r.attrib]
     assert len(frames) == 1
     assert frames[0].attrib["fill"] == "none"
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_portrait_is_cut_at_the_frame_floor(theme):
-    """Das Portrait endet an der Innenkante der unteren Rahmenlinie."""
-    from build_hero import FRAME_H, FRAME_STROKE, FRAME_Y
-
-    root = ET.fromstring(build_svg(theme))
-    image = root.find(f"{NS}image")
-    assert image.attrib["clip-path"] == "url(#portraitFloor)"
-
-    rect = root.find(f".//{NS}clipPath[@id='portraitFloor']/{NS}rect")
-    expected = FRAME_Y + FRAME_H - FRAME_STROKE / 2
-    assert float(rect.attrib["height"]) == pytest.approx(expected)
-    # Ohne Beschnitt liefe das Bild tatsaechlich tiefer, sonst waere der Test blind.
-    assert float(image.attrib["y"]) + float(image.attrib["height"]) > expected
-
-
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_build_svg_has_accessible_label(theme):
-    root = ET.fromstring(build_svg(theme))
-    assert root.attrib["role"] == "img"
-    assert "Kevin Brammer" in root.attrib["aria-label"]
+@pytest.mark.parametrize("theme", THEME_NAMES)
+def test_both_svgs_stay_transparent(theme):
+    """Kein gefuelltes Hintergrundrechteck, damit GitHubs Seitenton durchscheint."""
+    for markup in (build_headline_svg(theme), build_portrait_svg(theme)):
+        root = ET.fromstring(markup)
+        backgrounds = [
+            rect
+            for rect in root.findall(f"{NS}rect")
+            if rect.attrib.get("fill") not in (None, "none")
+            and float(rect.attrib.get("width", 0)) > 300
+        ]
+        assert backgrounds == []

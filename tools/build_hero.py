@@ -1,9 +1,17 @@
-"""Baut die animierten Hero-SVG fuer das Profil-README.
+"""Baut die SVG-Bausteine fuer das Profil-README.
 
-Der Rotator ahmt den Typewriter der Startseite von kevin-brammer.de nach.
-Da GitHub kein CSS und kein JavaScript in READMEs zulaesst, geschieht die
-Bewegung ueber SMIL: Je Wort gibt eine clipPath-Maske zeichenweise mehr
-Flaeche frei, waehrend Caret und Punkt auf derselben Zeitachse mitwandern.
+Erzeugt zwei getrennte Grafiken je Farbschema:
+
+* `headline-*.svg` — die animierte Textzeile, nichts sonst
+* `portrait-*.svg` — Rahmen und freigestelltes Portrait
+
+Die Trennung ist Absicht. Im README floatet das Portrait nach rechts,
+waehrend Headline und die anklickbare Icon-Reihe links direkt untereinander
+stehen. Laege beides in einer Grafik, saessen die Icons zwangslaeufig unter
+dem gesamten Bild und damit weit unter der Headline.
+
+Die Bewegung entsteht ueber SMIL, weil GitHub CSS und JavaScript aus READMEs
+entfernt. Der Rotator ahmt den Typewriter von kevin-brammer.de nach.
 """
 from __future__ import annotations
 
@@ -27,35 +35,25 @@ FONT_PATH = Path(
 )
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
-WIDTH = 1280
 HEADLINE_SIZE = 58.0
 LINE_HEIGHT = 67.0
-TEXT_X = 64.0
 HEADLINE_LINES = ["I help", "companies with"]
+TEXT_X = 2.0
+TEXT_PAD_TOP = 4.0
 CARET_WIDTH = 5.0
-
-# Die Kontakt-Icons liegen bewusst NICHT im SVG, sondern als einzelne Bilder
-# im README. GitHub bindet das Hero als <img> ein und entfernt darin jeden
-# Verweis, im SVG waeren die Icons also blosse Dekoration ohne Ziel.
 CARET_GAP = 5.0
 DOT_GAP = 4.0
 
 WORDS = ["digitalization", "automation", "process optimization", "data analytics"]
 TYPE_MS, HOLD_MS, ERASE_MS, PAUSE_MS = 90, 1800, 50, 380
 
-FRAME_X, FRAME_Y, FRAME_W, FRAME_H = 800.0, 150.0, 380.0, 475.0
+FRAME_W, FRAME_H = 380.0, 475.0
 FRAME_RADIUS = 22.0
 FRAME_STROKE = 3.5
 PORTRAIT_SCALE = 1.15
 PORTRAIT_DROP = 29.5
+PORTRAIT_PAD = 2.0
 
-# Die Zeichenflaeche endet kurz unter dem Rahmen. Weiter unten steht nichts
-# mehr, und ueberzaehlige Hoehe waere im README nur leerer Abstand.
-HEIGHT = round(FRAME_Y + FRAME_H + 12)
-
-# Das SVG bleibt vollstaendig transparent, damit GitHub seinen eigenen
-# Seitenhintergrund durchscheinen laesst. Eine gesetzte Flaeche wuerde in
-# jedem Theme leicht neben dem Seitenton liegen und als Kasten auffallen.
 THEMES = {
     # Marken-Violett aus tokens.css, Kontrast auf hellem Grund rund 5:1
     "light": {"ink": "#0a0a0a", "accent": "#8c52ff"},
@@ -63,10 +61,11 @@ THEMES = {
     "dark": {"ink": "#f0f6fc", "accent": "#a482ff"},
 }
 
-ARIA_LABEL = (
-    "Kevin Brammer - I help companies with digitalization, automation, "
+HEADLINE_LABEL = (
+    "I help companies with digitalization, automation, "
     "process optimization and data analytics."
 )
+PORTRAIT_LABEL = "Kevin Brammer"
 
 
 def word_timeline() -> list[dict]:
@@ -80,7 +79,6 @@ def word_timeline() -> list[dict]:
             {
                 "word": word,
                 "start": cursor,
-                "type_end": cursor + typing,
                 "hold_end": cursor + typing + HOLD_MS,
                 "erase_end": cursor + typing + HOLD_MS + erasing,
                 "end": cursor + typing + HOLD_MS + erasing + PAUSE_MS,
@@ -106,23 +104,19 @@ def _word_points(segment: dict, widths: list[float]) -> list[tuple[int, float]]:
     return points
 
 
-def _widths_for(font, word: str) -> list[float]:
-    return advance_widths(font, word, HEADLINE_SIZE)
-
-
 def _serialize(points: list[tuple[int, float]], offset: float = 0.0) -> tuple[str, str]:
-    """Formt (Zeit, Wert)-Punkte in SMIL-Attribute values und keyTimes um."""
+    """Formt (Zeit, Wert)-Punkte in die SMIL-Attribute values und keyTimes um."""
     values = ";".join(f"{value + offset:.2f}" for _, value in points)
     times = ";".join(f"{time / TOTAL_MS:.6f}" for time, _ in points)
     return values, times
 
 
-def caret_track(font=None) -> tuple[list[float], list[float]]:
-    """Globale Cursorkurve ueber den gesamten Loop, als (Breiten, normierte Zeiten)."""
-    font = font or load_font(FONT_PATH)
+def caret_track(font) -> list[tuple[int, float]]:
+    """Cursorkurve ueber den gesamten Loop, fuer Caret und Punkt."""
     points: list[tuple[int, float]] = []
     for segment in word_timeline():
-        for point in _word_points(segment, _widths_for(font, segment["word"])):
+        widths = advance_widths(font, segment["word"], HEADLINE_SIZE)
+        for point in _word_points(segment, widths):
             if points and points[-1][0] == point[0]:
                 continue
             points.append(point)
@@ -130,7 +124,7 @@ def caret_track(font=None) -> tuple[list[float], list[float]]:
         points.insert(0, (0, 0.0))
     if points[-1][0] != TOTAL_MS:
         points.append((TOTAL_MS, 0.0))
-    return [value for _, value in points], [time / TOTAL_MS for time, _ in points]
+    return points
 
 
 def _reveal_points(segment: dict, widths: list[float]) -> list[tuple[int, float]]:
@@ -151,14 +145,35 @@ def _animate(attribute: str, values: str, times: str) -> str:
     )
 
 
-def _rotator_markup(font, theme: dict, first_baseline: float) -> str:
-    baseline = first_baseline + len(HEADLINE_LINES) * LINE_HEIGHT
+def _deepest_descender(font) -> float:
+    """Tiefste Unterlaenge, die die Rotator-Zeile erreichen kann."""
+    return max(text_depth(font, word, HEADLINE_SIZE) for word in WORDS)
+
+
+def headline_size(font) -> tuple[float, float, float]:
+    """Breite, Hoehe und erste Grundlinie der Headline-Grafik."""
+    over = text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
+    height = TEXT_PAD_TOP + over + 2 * LINE_HEIGHT + _deepest_descender(font) + 2
+    longest = max(text_width(font, word, HEADLINE_SIZE) for word in WORDS)
+    width = (
+        TEXT_X
+        + longest
+        + CARET_GAP
+        + CARET_WIDTH
+        + DOT_GAP
+        + text_width(font, ".", HEADLINE_SIZE)
+        + 6
+    )
+    return width, height, TEXT_PAD_TOP + over
+
+
+def _rotator_markup(font, theme: dict, baseline: float) -> str:
     top = baseline - HEADLINE_SIZE
     box_height = HEADLINE_SIZE * 1.4
     parts: list[str] = []
 
     for index, segment in enumerate(word_timeline()):
-        widths = _widths_for(font, segment["word"])
+        widths = advance_widths(font, segment["word"], HEADLINE_SIZE)
         values, times = _serialize(_reveal_points(segment, widths))
         # Das erste Wort startet auf voller Breite, damit die Zeile auch dann
         # lesbar bleibt, wenn eine Umgebung SMIL ignoriert.
@@ -177,23 +192,21 @@ def _rotator_markup(font, theme: dict, first_baseline: float) -> str:
   </g>"""
         )
 
-    track_values, track_times = caret_track(font)
-    points = list(zip((int(t * TOTAL_MS) for t in track_times), track_values))
+    points = caret_track(font)
     caret_values, caret_times = _serialize(points, offset=TEXT_X + CARET_GAP)
-    dot_values, dot_times = _serialize(
-        points, offset=TEXT_X + CARET_GAP + CARET_WIDTH + DOT_GAP
-    )
+    dot_offset = TEXT_X + CARET_GAP + CARET_WIDTH + DOT_GAP
+    dot_values, dot_times = _serialize(points, offset=dot_offset)
 
     parts.append(
         f"""
-  <rect y="{baseline - HEADLINE_SIZE * 0.78:.2f}" width="{CARET_WIDTH}" height="{HEADLINE_SIZE * 0.78:.2f}"
-        fill="{theme['ink']}" x="{TEXT_X + CARET_GAP:.2f}">
+  <rect x="{TEXT_X + CARET_GAP:.2f}" y="{baseline - HEADLINE_SIZE * 0.78:.2f}"
+        width="{CARET_WIDTH}" height="{HEADLINE_SIZE * 0.78:.2f}" fill="{theme['ink']}">
     {_animate("x", caret_values, caret_times)}
     <animate attributeName="opacity" values="1;0" keyTimes="0;0.5" dur="1s"
              repeatCount="indefinite" calcMode="discrete" />
   </rect>
   <g fill="{theme['ink']}" transform="translate(0 {baseline:.2f})">
-    <g transform="translate({TEXT_X + CARET_GAP + CARET_WIDTH + DOT_GAP:.2f} 0)">
+    <g transform="translate({dot_offset:.2f} 0)">
       {text_to_path(font, ".", HEADLINE_SIZE)}
       <animateTransform attributeName="transform" type="translate"
                         values="{';'.join(f'{v} 0' for v in dot_values.split(';'))}"
@@ -205,78 +218,84 @@ def _rotator_markup(font, theme: dict, first_baseline: float) -> str:
     return "".join(parts)
 
 
-def _deepest_descender(font) -> float:
-    """Tiefste Unterlaenge, die die Rotator-Zeile erreichen kann."""
-    return max(text_depth(font, word, HEADLINE_SIZE) for word in WORDS)
-
-
-def first_baseline(font) -> float:
-    """Grundlinie der ersten Headline-Zeile.
-
-    Headline und Icon-Reihe bilden zusammen einen Block, der auf die Mitte des
-    sichtbaren Portraits gesetzt wird, gemessen von dessen Scheitel bis zur
-    Schnittkante am Rahmen. Gerechnet wird mit den tatsaechlichen Konturen:
-    die Oberlaenge in "I help" oben, die tiefste Unterlaenge eines
-    Rotator-Wortes unten.
-    """
-    _, portrait_y, _, portrait_h = _portrait_geometry()
-    visible_bottom = min(portrait_y + portrait_h, FRAME_Y + FRAME_H - FRAME_STROKE / 2)
-    center = (portrait_y + visible_bottom) / 2
-
-    over = text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
-    block_height = over + len(HEADLINE_LINES) * LINE_HEIGHT + _deepest_descender(font)
-    return center - block_height / 2 + over
-
-
-def _portrait_geometry() -> tuple[float, float, float, float]:
-    with Image.open(ASSETS / "portrait.png") as image:
-        ratio = image.height / image.width
-    width = FRAME_W * PORTRAIT_SCALE
-    height = width * ratio
-    x = FRAME_X + FRAME_W / 2 - width / 2
-    y = FRAME_Y + FRAME_H + PORTRAIT_DROP - height
-    return x, y, width, height
-
-
-def build_svg(theme_name: str) -> str:
+def build_headline_svg(theme_name: str) -> str:
     theme = THEMES[theme_name]
     font = load_font(FONT_PATH)
-    portrait_b64 = base64.b64encode((ASSETS / "portrait.png").read_bytes()).decode()
-    px, py, pw, ph = _portrait_geometry()
-    base = first_baseline(font)
+    width, height, baseline = headline_size(font)
 
-    # Das Portrait ragt oben und seitlich ueber den Rahmen hinaus, endet unten
-    # aber buendig an dessen Innenkante, statt darunter weiterzulaufen.
-    portrait_floor = FRAME_Y + FRAME_H - FRAME_STROKE / 2
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" \
+width="{width:.0f}" height="{height:.0f}" role="img" aria-label="{HEADLINE_LABEL}">
+  <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {baseline:.2f})">\
+{text_to_path(font, HEADLINE_LINES[0], HEADLINE_SIZE)}</g>
+  <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {baseline + LINE_HEIGHT:.2f})">\
+{text_to_path(font, HEADLINE_LINES[1], HEADLINE_SIZE)}</g>
+{_rotator_markup(font, theme, baseline + 2 * LINE_HEIGHT)}
+</svg>
+"""
 
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {WIDTH} {HEIGHT}" \
-width="{WIDTH}" height="{HEIGHT}" role="img" aria-label="{ARIA_LABEL}">
+
+def portrait_geometry() -> dict:
+    """Masse der Portraitgrafik, gerechnet vom Scheitel aus.
+
+    Das Portrait beginnt am oberen Bildrand und ragt seitlich ueber den
+    Rahmen hinaus. Unten endet es buendig an dessen Innenkante.
+    """
+    with Image.open(ASSETS / "portrait.png") as image:
+        ratio = image.height / image.width
+    portrait_w = FRAME_W * PORTRAIT_SCALE
+    portrait_h = portrait_w * ratio
+    frame_y = portrait_h - FRAME_H - PORTRAIT_DROP
+    return {
+        "portrait_x": PORTRAIT_PAD,
+        "portrait_y": PORTRAIT_PAD,
+        "portrait_w": portrait_w,
+        "portrait_h": portrait_h,
+        "frame_x": PORTRAIT_PAD + (portrait_w - FRAME_W) / 2,
+        "frame_y": PORTRAIT_PAD + frame_y,
+        "floor": PORTRAIT_PAD + frame_y + FRAME_H - FRAME_STROKE / 2,
+        "width": portrait_w + 2 * PORTRAIT_PAD,
+        "height": PORTRAIT_PAD + frame_y + FRAME_H + PORTRAIT_PAD,
+    }
+
+
+def build_portrait_svg(theme_name: str) -> str:
+    theme = THEMES[theme_name]
+    geometry = portrait_geometry()
+    encoded = base64.b64encode((ASSETS / "portrait.png").read_bytes()).decode()
+
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" \
+viewBox="0 0 {geometry['width']:.0f} {geometry['height']:.0f}" \
+width="{geometry['width']:.0f}" height="{geometry['height']:.0f}" \
+role="img" aria-label="{PORTRAIT_LABEL}">
   <defs>
     <clipPath id="portraitFloor">
-      <rect x="0" y="0" width="{WIDTH}" height="{portrait_floor:.2f}" />
+      <rect x="0" y="0" width="{geometry['width']:.2f}" height="{geometry['floor']:.2f}" />
     </clipPath>
   </defs>
-
-  <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {base:.2f})">\
-{text_to_path(font, HEADLINE_LINES[0], HEADLINE_SIZE)}</g>
-  <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {base + LINE_HEIGHT:.2f})">\
-{text_to_path(font, HEADLINE_LINES[1], HEADLINE_SIZE)}</g>
-{_rotator_markup(font, theme, base)}
-
-  <rect x="{FRAME_X}" y="{FRAME_Y}" width="{FRAME_W}" height="{FRAME_H}" rx="{FRAME_RADIUS}"
+  <rect x="{geometry['frame_x']:.2f}" y="{geometry['frame_y']:.2f}"
+        width="{FRAME_W}" height="{FRAME_H}" rx="{FRAME_RADIUS}"
         fill="none" stroke="{theme['ink']}" stroke-width="{FRAME_STROKE}" />
-  <image href="data:image/png;base64,{portrait_b64}" clip-path="url(#portraitFloor)"
-         x="{px:.2f}" y="{py:.2f}" width="{pw:.2f}" height="{ph:.2f}" />
+  <image href="data:image/png;base64,{encoded}" clip-path="url(#portraitFloor)"
+         x="{geometry['portrait_x']:.2f}" y="{geometry['portrait_y']:.2f}"
+         width="{geometry['portrait_w']:.2f}" height="{geometry['portrait_h']:.2f}" />
 </svg>
 """
 
 
 def main() -> None:
     for theme_name in THEMES:
-        target = ASSETS / f"hero-{theme_name}.svg"
-        target.write_text(build_svg(theme_name), encoding="utf-8")
-        print(f"{target.name}: {target.stat().st_size / 1024:.1f} KB")
-    print(f"Loop: {TOTAL_MS} ms")
+        for stem, markup in (
+            (f"headline-{theme_name}", build_headline_svg(theme_name)),
+            (f"portrait-{theme_name}", build_portrait_svg(theme_name)),
+        ):
+            target = ASSETS / f"{stem}.svg"
+            target.write_text(markup, encoding="utf-8")
+            print(f"{target.name}: {target.stat().st_size / 1024:.1f} KB")
+    font = load_font(FONT_PATH)
+    width, height, _ = headline_size(font)
+    geometry = portrait_geometry()
+    print(f"Headline {width:.0f} x {height:.0f}, Portrait "
+          f"{geometry['width']:.0f} x {geometry['height']:.0f}, Loop {TOTAL_MS} ms")
 
 
 if __name__ == "__main__":
