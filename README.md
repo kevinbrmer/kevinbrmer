@@ -3,12 +3,12 @@
   <img src="assets/portrait-light.svg" align="right" width="34%" alt="Kevin Brammer">
 </picture>
 
-<picture>
+<img src="assets/spacer.svg" width="40" height="1" alt=""><picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/headline-dark.svg">
   <img src="assets/headline-light.svg" width="44%" alt="I help companies with digitalization, automation, process optimization and data analytics.">
 </picture>
 
-<a href="mailto:hi@kevin-brammer.de"><img src="assets/icons/mail.svg" width="26" height="26" alt="Email"></a>
+<img src="assets/spacer.svg" width="40" height="1" alt=""><a href="mailto:hi@kevin-brammer.de"><img src="assets/icons/mail.svg" width="26" height="26" alt="Email"></a>
 &nbsp;&nbsp;
 <a href="https://www.linkedin.com/in/kevinbrmer/"><img src="assets/icons/linkedin.svg" width="26" height="26" alt="LinkedIn"></a>
 &nbsp;&nbsp;
