@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
+
+# Lokales Vorschau-Werkzeug fuer die Hero-SVG, gehoert nicht ins oeffentliche Profil
+assets/preview.html
