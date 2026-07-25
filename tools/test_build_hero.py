@@ -170,13 +170,16 @@ def test_outline_icons_keep_their_fill_none(theme):
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
-def test_icons_take_the_theme_colour(theme):
-    """Die Platzhalterfarbe der Icon-Dateien wird durch die Textfarbe ersetzt."""
-    from build_hero import ICON_PLACEHOLDER, THEMES
+def test_icons_stay_more_muted_than_the_headline(theme):
+    """Die Kontaktreihe traegt ein gedaempftes Grau, nicht die Textfarbe."""
+    from build_hero import THEMES
 
-    markup = build_svg(theme)
-    assert ICON_PLACEHOLDER not in markup
-    assert THEMES[theme]["ink"] in markup
+    root = ET.fromstring(build_svg(theme))
+    stroked = [g for g in root.iter(f"{NS}g") if "stroke" in g.attrib]
+    assert stroked
+    for group in stroked:
+        assert group.attrib["stroke"] == THEMES[theme]["icon"]
+    assert THEMES[theme]["icon"] != THEMES[theme]["ink"]
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])

@@ -62,11 +62,14 @@ HEIGHT = round(FRAME_Y + FRAME_H + 12)
 # Das SVG bleibt vollstaendig transparent, damit GitHub seinen eigenen
 # Seitenhintergrund durchscheinen laesst. Eine gesetzte Flaeche wuerde in
 # jedem Theme leicht neben dem Seitenton liegen und als Kasten auffallen.
+# "icon" steht bewusst gedaempfter als "ink": Die Kontaktreihe soll die
+# Headline begleiten, nicht mit ihr um Aufmerksamkeit konkurrieren.
 THEMES = {
     # Marken-Violett aus tokens.css, Kontrast auf hellem Grund rund 5:1
-    "light": {"ink": "#0a0a0a", "accent": "#8c52ff"},
-    # Aufgehelltes Violett, damit der Kontrast auf #0d1117 traegt
-    "dark": {"ink": "#f0f6fc", "accent": "#a482ff"},
+    "light": {"ink": "#0a0a0a", "accent": "#8c52ff", "icon": "#6a6a6a"},
+    # Aufgehelltes Violett, damit der Kontrast auf #0d1117 traegt.
+    # Das Icon-Grau entspricht GitHubs eigener Sekundaerfarbe im dunklen Theme.
+    "dark": {"ink": "#f0f6fc", "accent": "#a482ff", "icon": "#8b949e"},
 }
 
 ARIA_LABEL = (
@@ -281,8 +284,8 @@ def _icons_markup(theme: dict, top: float) -> str:
     for index, name in enumerate(ICON_NAMES):
         x = TEXT_X + index * (ICON_SIZE + ICON_GAP)
         inherited, body = _icon_parts(name)
-        inherited = inherited.replace(ICON_PLACEHOLDER, theme["ink"])
-        body = body.replace(ICON_PLACEHOLDER, theme["ink"])
+        inherited = inherited.replace(ICON_PLACEHOLDER, theme["icon"])
+        body = body.replace(ICON_PLACEHOLDER, theme["icon"])
         parts.append(
             f'  <g transform="translate({x:.2f} {top:.2f}) scale({scale:.4f})" '
             f"{inherited}>{body}</g>"
