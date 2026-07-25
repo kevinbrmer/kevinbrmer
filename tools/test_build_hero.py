@@ -92,6 +92,22 @@ def test_build_svg_embeds_portrait(theme):
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
+def test_headline_starts_at_portrait_top(theme):
+    """Oberkante der ersten Zeile liegt buendig mit dem Scheitel des Portraits."""
+    from build_hero import FONT_PATH, HEADLINE_LINES, HEADLINE_SIZE
+    from glyphs import load_font, text_top
+
+    root = ET.fromstring(build_svg(theme))
+    image = root.find(f"{NS}image")
+    groups = [g for g in root.findall(f"{NS}g") if "transform" in g.attrib]
+    baseline_y = float(groups[0].attrib["transform"].split()[-1].rstrip(")"))
+
+    font = load_font(FONT_PATH)
+    headline_top = baseline_y - text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
+    assert headline_top == pytest.approx(float(image.attrib["y"]), abs=0.5)
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
 def test_svg_stays_transparent(theme):
     """Kein gefuelltes Hintergrundrechteck, damit GitHubs Seitenton durchscheint."""
     root = ET.fromstring(build_svg(theme))

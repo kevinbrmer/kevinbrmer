@@ -18,8 +18,4 @@ state-of-the-art AI technologies to improve the way work gets done.
 &nbsp;&nbsp;
 <a href="https://kevin-brammer.de/blog/"><img src="assets/icons/blog.svg" width="26" height="26" alt="Blog"></a>
 
-<br>
-
-<sub>Kevin Brammer · Hanover, Germany · <a href="https://kevin-brammer.de">kevin-brammer.de</a></sub>
-
 </div>

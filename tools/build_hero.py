@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from glyphs import advance_widths, load_font, text_to_path, text_width
+from glyphs import advance_widths, load_font, text_to_path, text_top, text_width
 
 FONT_PATH = Path(
     r"C:\Users\KB\.claude\kevin-brammer-de\output\site\public\fonts"
@@ -20,11 +20,11 @@ FONT_PATH = Path(
 )
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
-WIDTH, HEIGHT = 1280, 660
-HEADLINE_SIZE = 58.0
-LINE_HEIGHT = 67.0
+WIDTH = 1200
+HEADLINE_SIZE = 62.0
+LINE_HEIGHT = 72.0
 TEXT_X = 64.0
-BASELINE_1 = 280.0
+HEADLINE_LINES = ["I help", "companies with"]
 CARET_WIDTH = 5.0
 CARET_GAP = 5.0
 DOT_GAP = 4.0
@@ -32,11 +32,18 @@ DOT_GAP = 4.0
 WORDS = ["digitalization", "automation", "process optimization", "data analytics"]
 TYPE_MS, HOLD_MS, ERASE_MS, PAUSE_MS = 90, 1800, 50, 380
 
-FRAME_X, FRAME_Y, FRAME_W, FRAME_H = 800.0, 150.0, 380.0, 475.0
+# Bewusst flaches Bannerformat: Steht die Headline oben buendig zum Scheitel,
+# waere sie bei einem hohen Portrait nur im oberen Drittel und darunter bliebe
+# eine leere Flaeche, die im README die Headline vom Untertitel wegdrueckt.
+FRAME_X, FRAME_Y, FRAME_W, FRAME_H = 820.0, 90.0, 300.0, 375.0
 FRAME_RADIUS = 22.0
 FRAME_STROKE = 3.5
 PORTRAIT_SCALE = 1.15
 PORTRAIT_DROP = 29.5
+
+# Die Zeichenflaeche endet kurz unter dem Rahmen. Weiter unten steht nichts
+# mehr, und ueberzaehlige Hoehe waere im README nur leerer Abstand.
+HEIGHT = round(FRAME_Y + FRAME_H + 12)
 
 # Das SVG bleibt vollstaendig transparent, damit GitHub seinen eigenen
 # Seitenhintergrund durchscheinen laesst. Eine gesetzte Flaeche wuerde in
@@ -136,8 +143,8 @@ def _animate(attribute: str, values: str, times: str) -> str:
     )
 
 
-def _rotator_markup(font, theme: dict) -> str:
-    baseline = BASELINE_1 + 2 * LINE_HEIGHT
+def _rotator_markup(font, theme: dict, first_baseline: float) -> str:
+    baseline = first_baseline + len(HEADLINE_LINES) * LINE_HEIGHT
     top = baseline - HEADLINE_SIZE
     box_height = HEADLINE_SIZE * 1.4
     parts: list[str] = []
@@ -190,6 +197,17 @@ def _rotator_markup(font, theme: dict) -> str:
     return "".join(parts)
 
 
+def first_baseline(font) -> float:
+    """Grundlinie der ersten Headline-Zeile.
+
+    Die Oberkante der Schrift liegt buendig mit dem Scheitel des Portraits.
+    Das PNG ist auf seinen sichtbaren Inhalt zugeschnitten, seine obere
+    Bildkante ist damit zugleich die Oberkante der Silhouette.
+    """
+    _, portrait_y, _, _ = _portrait_geometry()
+    return portrait_y + text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
+
+
 def _portrait_geometry() -> tuple[float, float, float, float]:
     with Image.open(ASSETS / "portrait.png") as image:
         ratio = image.height / image.width
@@ -205,6 +223,7 @@ def build_svg(theme_name: str) -> str:
     font = load_font(FONT_PATH)
     portrait_b64 = base64.b64encode((ASSETS / "portrait.png").read_bytes()).decode()
     px, py, pw, ph = _portrait_geometry()
+    base = first_baseline(font)
 
     # Das Portrait ragt oben und seitlich ueber den Rahmen hinaus, endet unten
     # aber buendig an dessen Innenkante, statt darunter weiterzulaufen.
@@ -218,11 +237,11 @@ width="{WIDTH}" height="{HEIGHT}" role="img" aria-label="{ARIA_LABEL}">
     </clipPath>
   </defs>
 
-  <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {BASELINE_1:.2f})">\
-{text_to_path(font, "I help", HEADLINE_SIZE)}</g>
-  <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {BASELINE_1 + LINE_HEIGHT:.2f})">\
-{text_to_path(font, "companies with", HEADLINE_SIZE)}</g>
-{_rotator_markup(font, theme)}
+  <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {base:.2f})">\
+{text_to_path(font, HEADLINE_LINES[0], HEADLINE_SIZE)}</g>
+  <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {base + LINE_HEIGHT:.2f})">\
+{text_to_path(font, HEADLINE_LINES[1], HEADLINE_SIZE)}</g>
+{_rotator_markup(font, theme, base)}
 
   <rect x="{FRAME_X}" y="{FRAME_Y}" width="{FRAME_W}" height="{FRAME_H}" rx="{FRAME_RADIUS}"
         fill="none" stroke="{theme['ink']}" stroke-width="{FRAME_STROKE}" />

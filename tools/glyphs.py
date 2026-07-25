@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from fontTools.pens.boundsPen import BoundsPen
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.ttLib import TTFont
 
@@ -39,6 +40,23 @@ def advance_widths(font: TTFont, text: str, size: float) -> list[float]:
 def text_width(font: TTFont, text: str, size: float) -> float:
     """Gesamtbreite des gesetzten Textes."""
     return advance_widths(font, text, size)[-1]
+
+
+def text_top(font: TTFont, text: str, size: float) -> float:
+    """Hoehe der obersten Kontur ueber der Grundlinie.
+
+    Massgeblich ist die tatsaechliche Oberkante der gezeichneten Glyphen, nicht
+    die Versalhoehe: In "I help" ragt die Oberlaenge des h ueber das I hinaus.
+    """
+    glyph_set = font.getGlyphSet()
+    scale = size / font["head"].unitsPerEm
+    highest = 0.0
+    for name in _glyph_names(font, text):
+        pen = BoundsPen(glyph_set)
+        glyph_set[name].draw(pen)
+        if pen.bounds:
+            highest = max(highest, pen.bounds[3])
+    return highest * scale
 
 
 def text_to_path(font: TTFont, text: str, size: float) -> str:
