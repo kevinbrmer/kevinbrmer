@@ -3,7 +3,7 @@
   <img alt="Kevin Brammer — I help companies with digitalization, automation, process optimization and data analytics." src="assets/hero-light.svg" width="100%">
 </picture>
 
-<img src="assets/spacer.svg" width="5%" height="1" alt="">
+<img src="assets/spacer.svg" width="45" height="1" alt="">
 <a href="mailto:hi@kevin-brammer.de"><img src="assets/icons/mail.svg" width="26" height="26" alt="Email"></a>
 &nbsp;&nbsp;
 <a href="https://www.linkedin.com/in/kevinbrmer/"><img src="assets/icons/linkedin.svg" width="26" height="26" alt="LinkedIn"></a>
@@ -16,7 +16,7 @@
 
 <br>
 
-<img src="assets/spacer.svg" width="5%" height="1" alt="">**Latest posts**
+<img src="assets/spacer.svg" width="45" height="1" alt="">**Latest posts**
 
 <!-- BLOG:START -->
 - [Das beste Modell für alles ist der teuerste Fehler: Wie aus einer Forschungsidee ein Produkt wurde](https://kevin-brammer.de/blog/deep-dive-workload-routing-2026/) — 2026-07-25
