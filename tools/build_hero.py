@@ -38,16 +38,18 @@ ASSETS = Path(__file__).resolve().parent.parent / "assets"
 HEADLINE_SIZE = 58.0
 LINE_HEIGHT = 67.0
 HEADLINE_LINES = ["I help", "companies with"]
-# Linker Einzug der Headline. Er steckt in der Grafik selbst, weil ein
-# Abstandhalter vor dem <picture>-Element im README wirkungslos bleibt: Das
-# Element beginnt eine neue Zeile und laesst den Halter zurueck.
-TEXT_X = 40.0
+# Linker Einzug der Headline, gemessen in Leerzeichen der Headline-Schrift.
+# Er steckt in der Grafik selbst, weil ein Abstandhalter vor dem
+# <picture>-Element im README wirkungslos bleibt: Das Element beginnt eine
+# neue Zeile und laesst den Halter zurueck.
+INDENT_SPACES = 7.3
 CARET_WIDTH = 5.0
 
-# Darstellungsbreiten im README, als Anteil der Containerbreite. Sie bestimmen
-# zugleich die wahrgenommene Schriftgroesse und die vertikale Ausrichtung und
-# muessen deshalb mit den width-Angaben in README.md uebereinstimmen.
-README_HEADLINE_W = 0.47
+# Angestrebte Schriftgroesse im README-Kasten. Die Breitenangabe der
+# Headline-Grafik wird daraus abgeleitet, damit ein geaenderter Einzug die
+# Schrift nicht mitskaliert.
+README_FONT_TARGET = 40.0
+README_CONTAINER = 895.0
 README_PORTRAIT_W = 0.34
 HEADLINE_PAD_BOTTOM = 26.0
 CARET_GAP = 5.0
@@ -162,16 +164,32 @@ def _deepest_descender(font) -> float:
     return max(text_depth(font, word, HEADLINE_SIZE) for word in WORDS)
 
 
+def text_x(font) -> float:
+    """Linker Einzug der Headline, in Leerzeichen der Headline-Schrift."""
+    return INDENT_SPACES * text_width(font, " ", HEADLINE_SIZE)
+
+
 def _headline_width(font) -> float:
     longest = max(text_width(font, word, HEADLINE_SIZE) for word in WORDS)
     return (
-        TEXT_X
+        text_x(font)
         + longest
         + CARET_GAP
         + CARET_WIDTH
         + DOT_GAP
         + text_width(font, ".", HEADLINE_SIZE)
         + 6
+    )
+
+
+def readme_headline_width(font) -> float:
+    """Anteil der Containerbreite, den die Headline-Grafik einnehmen soll.
+
+    Abgeleitet aus der angestrebten Schriftgroesse, damit ein veraenderter
+    Einzug die Grafik verbreitert, ohne die Schrift zu verkleinern.
+    """
+    return (
+        README_FONT_TARGET / HEADLINE_SIZE * _headline_width(font) / README_CONTAINER
     )
 
 
@@ -188,7 +206,7 @@ def _pad_top(font) -> float:
     # Mitte des Portraits, gemessen in Anteilen der Containerbreite
     portrait_middle = README_PORTRAIT_W * portrait_ratio / 2
     # dieselbe Hoehe, umgerechnet in Koordinaten der Headline-Grafik
-    target = portrait_middle * _headline_width(font) / README_HEADLINE_W
+    target = portrait_middle * _headline_width(font) / readme_headline_width(font)
 
     block = (
         text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
@@ -213,6 +231,7 @@ def headline_size(font) -> tuple[float, float, float]:
 
 
 def _rotator_markup(font, theme: dict, baseline: float) -> str:
+    left = text_x(font)
     top = baseline - HEADLINE_SIZE
     box_height = HEADLINE_SIZE * 1.4
     parts: list[str] = []
@@ -226,25 +245,25 @@ def _rotator_markup(font, theme: dict, baseline: float) -> str:
         parts.append(
             f"""
   <clipPath id="reveal{index}">
-    <rect x="{TEXT_X:.2f}" y="{top:.2f}" width="{initial:.2f}" height="{box_height:.2f}">
+    <rect x="{left:.2f}" y="{top:.2f}" width="{initial:.2f}" height="{box_height:.2f}">
       {_animate("width", values, times)}
     </rect>
   </clipPath>
   <g clip-path="url(#reveal{index})">
-    <g transform="translate({TEXT_X:.2f} {baseline:.2f})" fill="{theme['accent']}">
+    <g transform="translate({left:.2f} {baseline:.2f})" fill="{theme['accent']}">
       {text_to_path(font, segment["word"], HEADLINE_SIZE)}
     </g>
   </g>"""
         )
 
     points = caret_track(font)
-    caret_values, caret_times = _serialize(points, offset=TEXT_X + CARET_GAP)
-    dot_offset = TEXT_X + CARET_GAP + CARET_WIDTH + DOT_GAP
+    caret_values, caret_times = _serialize(points, offset=left + CARET_GAP)
+    dot_offset = left + CARET_GAP + CARET_WIDTH + DOT_GAP
     dot_values, dot_times = _serialize(points, offset=dot_offset)
 
     parts.append(
         f"""
-  <rect x="{TEXT_X + CARET_GAP:.2f}" y="{baseline - HEADLINE_SIZE * 0.78:.2f}"
+  <rect x="{left + CARET_GAP:.2f}" y="{baseline - HEADLINE_SIZE * 0.78:.2f}"
         width="{CARET_WIDTH}" height="{HEADLINE_SIZE * 0.78:.2f}" fill="{theme['ink']}">
     {_animate("x", caret_values, caret_times)}
     <animate attributeName="opacity" values="1;0" keyTimes="0;0.5" dur="1s"
@@ -267,12 +286,13 @@ def build_headline_svg(theme_name: str) -> str:
     theme = THEMES[theme_name]
     font = load_font(FONT_PATH)
     width, height, baseline = headline_size(font)
+    left = text_x(font)
 
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" \
 width="{width:.0f}" height="{height:.0f}" role="img" aria-label="{HEADLINE_LABEL}">
-  <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {baseline:.2f})">\
+  <g fill="{theme['ink']}" transform="translate({left:.2f} {baseline:.2f})">\
 {text_to_path(font, HEADLINE_LINES[0], HEADLINE_SIZE)}</g>
-  <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {baseline + LINE_HEIGHT:.2f})">\
+  <g fill="{theme['ink']}" transform="translate({left:.2f} {baseline + LINE_HEIGHT:.2f})">\
 {text_to_path(font, HEADLINE_LINES[1], HEADLINE_SIZE)}</g>
 {_rotator_markup(font, theme, baseline + 2 * LINE_HEIGHT)}
 </svg>
@@ -342,12 +362,16 @@ def main() -> None:
     print(f"Headline {width:.0f} x {height:.0f}, Portrait "
           f"{geometry['width']:.0f} x {geometry['height']:.0f}, Loop {TOTAL_MS} ms")
 
-    # Der Einzug der Headline steckt in der Grafik und schrumpft mit ihr. Die
-    # Icon-Reihe im README braucht denselben Abstand als festen Pixelwert.
-    container = 895.0  # uebliche Breite des README-Kastens auf github.com
-    scale = README_HEADLINE_W * container / width
-    print(f"Schrift im README {HEADLINE_SIZE * scale:.1f} px, "
-          f"Abstandhalter fuer die Icon-Reihe {TEXT_X * scale:.0f} px")
+    # Diese beiden Werte gehoeren nach README.md. Der Einzug der Headline
+    # steckt in der Grafik und schrumpft mit ihr, die Icon-Reihe daneben
+    # braucht denselben Abstand als festen Pixelwert.
+    share = readme_headline_width(font)
+    scale = share * README_CONTAINER / width
+    print(
+        f"README: Headline width=\"{share * 100:.0f}%\", "
+        f"Abstandhalter der Icon-Reihe {text_x(font) * scale:.0f} px "
+        f"(Schrift {HEADLINE_SIZE * scale:.1f} px)"
+    )
 
 
 if __name__ == "__main__":
