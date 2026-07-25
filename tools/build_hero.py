@@ -38,13 +38,16 @@ ASSETS = Path(__file__).resolve().parent.parent / "assets"
 HEADLINE_SIZE = 58.0
 LINE_HEIGHT = 67.0
 HEADLINE_LINES = ["I help", "companies with"]
-TEXT_X = 2.0
+# Linker Einzug der Headline. Er steckt in der Grafik selbst, weil ein
+# Abstandhalter vor dem <picture>-Element im README wirkungslos bleibt: Das
+# Element beginnt eine neue Zeile und laesst den Halter zurueck.
+TEXT_X = 40.0
 CARET_WIDTH = 5.0
 
 # Darstellungsbreiten im README, als Anteil der Containerbreite. Sie bestimmen
 # zugleich die wahrgenommene Schriftgroesse und die vertikale Ausrichtung und
 # muessen deshalb mit den width-Angaben in README.md uebereinstimmen.
-README_HEADLINE_W = 0.44
+README_HEADLINE_W = 0.47
 README_PORTRAIT_W = 0.34
 HEADLINE_PAD_BOTTOM = 26.0
 CARET_GAP = 5.0
@@ -338,6 +341,13 @@ def main() -> None:
     geometry = portrait_geometry()
     print(f"Headline {width:.0f} x {height:.0f}, Portrait "
           f"{geometry['width']:.0f} x {geometry['height']:.0f}, Loop {TOTAL_MS} ms")
+
+    # Der Einzug der Headline steckt in der Grafik und schrumpft mit ihr. Die
+    # Icon-Reihe im README braucht denselben Abstand als festen Pixelwert.
+    container = 895.0  # uebliche Breite des README-Kastens auf github.com
+    scale = README_HEADLINE_W * container / width
+    print(f"Schrift im README {HEADLINE_SIZE * scale:.1f} px, "
+          f"Abstandhalter fuer die Icon-Reihe {TEXT_X * scale:.0f} px")
 
 
 if __name__ == "__main__":
