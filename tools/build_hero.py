@@ -8,6 +8,7 @@ Flaeche frei, waehrend Caret und Punkt auf derselben Zeitachse mitwandern.
 from __future__ import annotations
 
 import base64
+import re
 from pathlib import Path
 
 from PIL import Image
@@ -33,6 +34,15 @@ LINE_HEIGHT = 67.0
 TEXT_X = 64.0
 HEADLINE_LINES = ["I help", "companies with"]
 CARET_WIDTH = 5.0
+
+# Die Icons werden aus assets/icons/ eingelesen, statt ihre Pfade hier zu
+# wiederholen. Alle nutzen viewBox "0 0 24 24" und die Platzhalterfarbe
+# #6a6a6a, die hier gegen die Textfarbe des Themes getauscht wird.
+ICON_NAMES = ["mail", "linkedin", "x", "web", "blog"]
+ICON_PLACEHOLDER = "#6a6a6a"
+ICON_SIZE = 34.0
+ICON_GAP = 24.0
+ICON_TOP_GAP = 46.0
 CARET_GAP = 5.0
 DOT_GAP = 4.0
 
@@ -201,24 +211,83 @@ def _rotator_markup(font, theme: dict, first_baseline: float) -> str:
     return "".join(parts)
 
 
+def _deepest_descender(font) -> float:
+    """Tiefste Unterlaenge, die die Rotator-Zeile erreichen kann."""
+    return max(text_depth(font, word, HEADLINE_SIZE) for word in WORDS)
+
+
 def first_baseline(font) -> float:
     """Grundlinie der ersten Headline-Zeile.
 
-    Der dreizeilige Textblock wird auf die Mitte des sichtbaren Portraits
-    gesetzt, gemessen von dessen Scheitel bis zur Schnittkante am Rahmen.
-    Gerechnet wird mit den tatsaechlichen Konturen: Die Oberkante bestimmt
-    die Oberlaenge in "I help", die Unterkante die tiefste Unterlaenge, die
-    ein Rotator-Wort erreichen kann.
+    Headline und Icon-Reihe bilden zusammen einen Block, der auf die Mitte des
+    sichtbaren Portraits gesetzt wird, gemessen von dessen Scheitel bis zur
+    Schnittkante am Rahmen. Gerechnet wird mit den tatsaechlichen Konturen:
+    die Oberlaenge in "I help" oben, die tiefste Unterlaenge eines
+    Rotator-Wortes unten.
     """
     _, portrait_y, _, portrait_h = _portrait_geometry()
     visible_bottom = min(portrait_y + portrait_h, FRAME_Y + FRAME_H - FRAME_STROKE / 2)
     center = (portrait_y + visible_bottom) / 2
 
     over = text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
-    under = max(text_depth(font, word, HEADLINE_SIZE) for word in WORDS)
-    block_height = over + (len(HEADLINE_LINES)) * LINE_HEIGHT + under
-
+    block_height = (
+        over
+        + len(HEADLINE_LINES) * LINE_HEIGHT
+        + _deepest_descender(font)
+        + ICON_TOP_GAP
+        + ICON_SIZE
+    )
     return center - block_height / 2 + over
+
+
+def icons_top(font) -> float:
+    """Obere Kante der Icon-Reihe, unterhalb der Rotator-Zeile."""
+    return (
+        first_baseline(font)
+        + len(HEADLINE_LINES) * LINE_HEIGHT
+        + _deepest_descender(font)
+        + ICON_TOP_GAP
+    )
+
+
+def _icon_parts(name: str) -> tuple[str, str]:
+    """Praesentationsattribute und Innenleben einer Icon-Datei.
+
+    Die Attribute des svg-Elements muessen mitgenommen werden. Sie tragen
+    fill="none" und die Strichbreite, die die inneren Formen erben. Ohne sie
+    faellt jede Kontur auf den schwarzen Standard-Fill zurueck.
+    """
+    markup = (ASSETS / "icons" / f"{name}.svg").read_text(encoding="utf-8")
+    head_end = markup.index(">", markup.index("<svg"))
+    head = markup[markup.index("<svg") : head_end]
+    body = markup[head_end + 1 : markup.rindex("</svg>")].strip()
+
+    attributes = dict(re.findall(r'([\w-]+)="([^"]*)"', head))
+    for ignored in ("xmlns", "viewBox", "width", "height"):
+        attributes.pop(ignored, None)
+    inherited = " ".join(f'{key}="{value}"' for key, value in attributes.items())
+    return inherited, body
+
+
+def _icons_markup(theme: dict, top: float) -> str:
+    """Icon-Reihe linksbuendig zur Headline.
+
+    Die Icons sind hier reine Grafik. Innerhalb eines als <img> eingebundenen
+    SVG traegt GitHub keine Verweise, anklickbar waeren sie nur als einzelne
+    Bilder im Markdown.
+    """
+    scale = ICON_SIZE / 24.0
+    parts = []
+    for index, name in enumerate(ICON_NAMES):
+        x = TEXT_X + index * (ICON_SIZE + ICON_GAP)
+        inherited, body = _icon_parts(name)
+        inherited = inherited.replace(ICON_PLACEHOLDER, theme["ink"])
+        body = body.replace(ICON_PLACEHOLDER, theme["ink"])
+        parts.append(
+            f'  <g transform="translate({x:.2f} {top:.2f}) scale({scale:.4f})" '
+            f"{inherited}>{body}</g>"
+        )
+    return "\n".join(parts)
 
 
 def _portrait_geometry() -> tuple[float, float, float, float]:
@@ -255,6 +324,8 @@ width="{WIDTH}" height="{HEIGHT}" role="img" aria-label="{ARIA_LABEL}">
   <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {base + LINE_HEIGHT:.2f})">\
 {text_to_path(font, HEADLINE_LINES[1], HEADLINE_SIZE)}</g>
 {_rotator_markup(font, theme, base)}
+
+{_icons_markup(theme, icons_top(font))}
 
   <rect x="{FRAME_X}" y="{FRAME_Y}" width="{FRAME_W}" height="{FRAME_H}" rx="{FRAME_RADIUS}"
         fill="none" stroke="{theme['ink']}" stroke-width="{FRAME_STROKE}" />
