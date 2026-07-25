@@ -39,8 +39,14 @@ HEADLINE_SIZE = 58.0
 LINE_HEIGHT = 67.0
 HEADLINE_LINES = ["I help", "companies with"]
 TEXT_X = 2.0
-TEXT_PAD_TOP = 4.0
 CARET_WIDTH = 5.0
+
+# Darstellungsbreiten im README, als Anteil der Containerbreite. Sie bestimmen
+# zugleich die wahrgenommene Schriftgroesse und die vertikale Ausrichtung und
+# muessen deshalb mit den width-Angaben in README.md uebereinstimmen.
+README_HEADLINE_W = 0.44
+README_PORTRAIT_W = 0.34
+HEADLINE_PAD_BOTTOM = 26.0
 CARET_GAP = 5.0
 DOT_GAP = 4.0
 
@@ -53,6 +59,9 @@ FRAME_STROKE = 3.5
 PORTRAIT_SCALE = 1.15
 PORTRAIT_DROP = 29.5
 PORTRAIT_PAD = 2.0
+# Luft unter dem Rahmen, damit das Portrait im README nicht am unteren Rand
+# des Kastens klebt.
+PORTRAIT_PAD_BOTTOM = 44.0
 
 THEMES = {
     # Marken-Violett aus tokens.css, Kontrast auf hellem Grund rund 5:1
@@ -150,12 +159,9 @@ def _deepest_descender(font) -> float:
     return max(text_depth(font, word, HEADLINE_SIZE) for word in WORDS)
 
 
-def headline_size(font) -> tuple[float, float, float]:
-    """Breite, Hoehe und erste Grundlinie der Headline-Grafik."""
-    over = text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
-    height = TEXT_PAD_TOP + over + 2 * LINE_HEIGHT + _deepest_descender(font) + 2
+def _headline_width(font) -> float:
     longest = max(text_width(font, word, HEADLINE_SIZE) for word in WORDS)
-    width = (
+    return (
         TEXT_X
         + longest
         + CARET_GAP
@@ -164,7 +170,43 @@ def headline_size(font) -> tuple[float, float, float]:
         + text_width(font, ".", HEADLINE_SIZE)
         + 6
     )
-    return width, height, TEXT_PAD_TOP + over
+
+
+def _pad_top(font) -> float:
+    """Leerraum ueber der ersten Zeile.
+
+    Der Textblock soll im README auf halber Hoehe des rechts daneben
+    stehenden Portraits sitzen. Beide Grafiken werden an derselben
+    Containerbreite skaliert, ihr Groessenverhaeltnis ist deshalb von der
+    tatsaechlichen Breite unabhaengig und laesst sich hier fest ausrechnen.
+    """
+    geometry = portrait_geometry()
+    portrait_ratio = geometry["height"] / geometry["width"]
+    # Mitte des Portraits, gemessen in Anteilen der Containerbreite
+    portrait_middle = README_PORTRAIT_W * portrait_ratio / 2
+    # dieselbe Hoehe, umgerechnet in Koordinaten der Headline-Grafik
+    target = portrait_middle * _headline_width(font) / README_HEADLINE_W
+
+    block = (
+        text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
+        + 2 * LINE_HEIGHT
+        + _deepest_descender(font)
+    )
+    return max(0.0, target - block / 2)
+
+
+def headline_size(font) -> tuple[float, float, float]:
+    """Breite, Hoehe und erste Grundlinie der Headline-Grafik."""
+    pad_top = _pad_top(font)
+    over = text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
+    height = (
+        pad_top
+        + over
+        + 2 * LINE_HEIGHT
+        + _deepest_descender(font)
+        + HEADLINE_PAD_BOTTOM
+    )
+    return _headline_width(font), height, pad_top + over
 
 
 def _rotator_markup(font, theme: dict, baseline: float) -> str:
@@ -254,7 +296,7 @@ def portrait_geometry() -> dict:
         "frame_y": PORTRAIT_PAD + frame_y,
         "floor": PORTRAIT_PAD + frame_y + FRAME_H - FRAME_STROKE / 2,
         "width": portrait_w + 2 * PORTRAIT_PAD,
-        "height": PORTRAIT_PAD + frame_y + FRAME_H + PORTRAIT_PAD,
+        "height": PORTRAIT_PAD + frame_y + FRAME_H + PORTRAIT_PAD_BOTTOM,
     }
 
 

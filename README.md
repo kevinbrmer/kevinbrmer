@@ -1,11 +1,11 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/portrait-dark.svg">
-  <img src="assets/portrait-light.svg" align="right" width="30%" alt="Kevin Brammer">
+  <img src="assets/portrait-light.svg" align="right" width="34%" alt="Kevin Brammer">
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/headline-dark.svg">
-  <img src="assets/headline-light.svg" width="58%" alt="I help companies with digitalization, automation, process optimization and data analytics.">
+  <img src="assets/headline-light.svg" width="44%" alt="I help companies with digitalization, automation, process optimization and data analytics.">
 </picture>
 
 <a href="mailto:hi@kevin-brammer.de"><img src="assets/icons/mail.svg" width="26" height="26" alt="Email"></a>
@@ -17,3 +17,6 @@
 <a href="https://kevin-brammer.de"><img src="assets/icons/web.svg" width="26" height="26" alt="Website"></a>
 &nbsp;&nbsp;
 <a href="https://kevin-brammer.de/blog/"><img src="assets/icons/blog.svg" width="26" height="26" alt="Blog"></a>
+
+<br>
+<br>
