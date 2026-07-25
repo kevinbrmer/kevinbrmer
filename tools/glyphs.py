@@ -59,6 +59,23 @@ def text_top(font: TTFont, text: str, size: float) -> float:
     return highest * scale
 
 
+def text_depth(font: TTFont, text: str, size: float) -> float:
+    """Tiefe der untersten Kontur unter der Grundlinie, als positiver Wert.
+
+    Ohne Unterlaengen ist das Ergebnis null, etwa bei "automation". Bei
+    "process optimization" bestimmt das p die Unterkante der Zeile.
+    """
+    glyph_set = font.getGlyphSet()
+    scale = size / font["head"].unitsPerEm
+    lowest = 0.0
+    for name in _glyph_names(font, text):
+        pen = BoundsPen(glyph_set)
+        glyph_set[name].draw(pen)
+        if pen.bounds:
+            lowest = min(lowest, pen.bounds[1])
+    return -lowest * scale
+
+
 def text_to_path(font: TTFont, text: str, size: float) -> str:
     """Setzt den Text als Folge positionierter SVG-Gruppen, Grundlinie bei y=0.
 

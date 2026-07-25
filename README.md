@@ -5,9 +5,6 @@
   <img alt="Kevin Brammer — I help companies with digitalization, automation, process optimization and data analytics." src="assets/hero-light.svg" width="100%">
 </picture>
 
-User-centered ideation with agile delivery, data-driven optimization and
-state-of-the-art AI technologies to improve the way work gets done.
-
 <a href="mailto:hi@kevin-brammer.de"><img src="assets/icons/mail.svg" width="26" height="26" alt="Email"></a>
 &nbsp;&nbsp;
 <a href="https://www.linkedin.com/in/kevinbrmer/"><img src="assets/icons/linkedin.svg" width="26" height="26" alt="LinkedIn"></a>

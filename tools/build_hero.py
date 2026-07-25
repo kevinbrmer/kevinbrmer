@@ -12,7 +12,14 @@ from pathlib import Path
 
 from PIL import Image
 
-from glyphs import advance_widths, load_font, text_to_path, text_top, text_width
+from glyphs import (
+    advance_widths,
+    load_font,
+    text_depth,
+    text_to_path,
+    text_top,
+    text_width,
+)
 
 FONT_PATH = Path(
     r"C:\Users\KB\.claude\kevin-brammer-de\output\site\public\fonts"
@@ -20,9 +27,9 @@ FONT_PATH = Path(
 )
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
-WIDTH = 1200
-HEADLINE_SIZE = 62.0
-LINE_HEIGHT = 72.0
+WIDTH = 1280
+HEADLINE_SIZE = 58.0
+LINE_HEIGHT = 67.0
 TEXT_X = 64.0
 HEADLINE_LINES = ["I help", "companies with"]
 CARET_WIDTH = 5.0
@@ -32,10 +39,7 @@ DOT_GAP = 4.0
 WORDS = ["digitalization", "automation", "process optimization", "data analytics"]
 TYPE_MS, HOLD_MS, ERASE_MS, PAUSE_MS = 90, 1800, 50, 380
 
-# Bewusst flaches Bannerformat: Steht die Headline oben buendig zum Scheitel,
-# waere sie bei einem hohen Portrait nur im oberen Drittel und darunter bliebe
-# eine leere Flaeche, die im README die Headline vom Untertitel wegdrueckt.
-FRAME_X, FRAME_Y, FRAME_W, FRAME_H = 820.0, 90.0, 300.0, 375.0
+FRAME_X, FRAME_Y, FRAME_W, FRAME_H = 800.0, 150.0, 380.0, 475.0
 FRAME_RADIUS = 22.0
 FRAME_STROKE = 3.5
 PORTRAIT_SCALE = 1.15
@@ -200,12 +204,21 @@ def _rotator_markup(font, theme: dict, first_baseline: float) -> str:
 def first_baseline(font) -> float:
     """Grundlinie der ersten Headline-Zeile.
 
-    Die Oberkante der Schrift liegt buendig mit dem Scheitel des Portraits.
-    Das PNG ist auf seinen sichtbaren Inhalt zugeschnitten, seine obere
-    Bildkante ist damit zugleich die Oberkante der Silhouette.
+    Der dreizeilige Textblock wird auf die Mitte des sichtbaren Portraits
+    gesetzt, gemessen von dessen Scheitel bis zur Schnittkante am Rahmen.
+    Gerechnet wird mit den tatsaechlichen Konturen: Die Oberkante bestimmt
+    die Oberlaenge in "I help", die Unterkante die tiefste Unterlaenge, die
+    ein Rotator-Wort erreichen kann.
     """
-    _, portrait_y, _, _ = _portrait_geometry()
-    return portrait_y + text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
+    _, portrait_y, _, portrait_h = _portrait_geometry()
+    visible_bottom = min(portrait_y + portrait_h, FRAME_Y + FRAME_H - FRAME_STROKE / 2)
+    center = (portrait_y + visible_bottom) / 2
+
+    over = text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
+    under = max(text_depth(font, word, HEADLINE_SIZE) for word in WORDS)
+    block_height = over + (len(HEADLINE_LINES)) * LINE_HEIGHT + under
+
+    return center - block_height / 2 + over
 
 
 def _portrait_geometry() -> tuple[float, float, float, float]:

@@ -92,10 +92,18 @@ def test_build_svg_embeds_portrait(theme):
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
-def test_headline_starts_at_portrait_top(theme):
-    """Oberkante der ersten Zeile liegt buendig mit dem Scheitel des Portraits."""
-    from build_hero import FONT_PATH, HEADLINE_LINES, HEADLINE_SIZE
-    from glyphs import load_font, text_top
+def test_headline_block_is_centered_on_the_portrait(theme):
+    """Die Mitte des Textblocks liegt auf der Mitte des sichtbaren Portraits."""
+    from build_hero import (
+        FONT_PATH,
+        FRAME_H,
+        FRAME_STROKE,
+        FRAME_Y,
+        HEADLINE_LINES,
+        HEADLINE_SIZE,
+        LINE_HEIGHT,
+    )
+    from glyphs import load_font, text_depth, text_top
 
     root = ET.fromstring(build_svg(theme))
     image = root.find(f"{NS}image")
@@ -103,8 +111,19 @@ def test_headline_starts_at_portrait_top(theme):
     baseline_y = float(groups[0].attrib["transform"].split()[-1].rstrip(")"))
 
     font = load_font(FONT_PATH)
-    headline_top = baseline_y - text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
-    assert headline_top == pytest.approx(float(image.attrib["y"]), abs=0.5)
+    over = text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
+    under = max(text_depth(font, word, HEADLINE_SIZE) for word in WORDS)
+    block_top = baseline_y - over
+    block_bottom = baseline_y + len(HEADLINE_LINES) * LINE_HEIGHT + under
+
+    portrait_top = float(image.attrib["y"])
+    portrait_bottom = min(
+        portrait_top + float(image.attrib["height"]),
+        FRAME_Y + FRAME_H - FRAME_STROKE / 2,
+    )
+    assert (block_top + block_bottom) / 2 == pytest.approx(
+        (portrait_top + portrait_bottom) / 2, abs=0.5
+    )
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
