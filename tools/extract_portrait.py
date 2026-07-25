@@ -11,7 +11,7 @@ import io
 import re
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 SRC = Path(r"C:\Users\KB\.claude\kevin-brammer-de\output\site\public\me-website.svg")
 DST = Path(__file__).resolve().parent.parent / "assets" / "portrait.png"
@@ -45,6 +45,19 @@ def split_photo_and_mask(svg_text: str) -> tuple[Image.Image, Image.Image]:
     return photo, mask
 
 
+def tighten_alpha(mask: Image.Image) -> Image.Image:
+    """Entfernt den hellen Saum an der Freistellerkante.
+
+    Die Randpixel des Fotos mischen Motiv und weissen Studiohintergrund. Auf
+    hellem Grund faellt das nicht auf, auf GitHubs dunklem Theme erscheint ein
+    Lichthof. Die Kante wird daher hart geschnitten, um einen Pixel nach innen
+    gezogen und nur minimal weichgezeichnet, damit sie nicht ausfranst.
+    """
+    hard = mask.point(lambda value: 255 if value >= 160 else 0)
+    eroded = hard.filter(ImageFilter.MinFilter(3))
+    return eroded.filter(ImageFilter.GaussianBlur(0.6))
+
+
 def main() -> None:
     photo, mask = split_photo_and_mask(SRC.read_text(encoding="utf-8"))
     print(f"Foto:  {photo.width}x{photo.height}")
@@ -55,7 +68,7 @@ def main() -> None:
         print(f"Maske auf Fotogroesse skaliert: {mask.width}x{mask.height}")
 
     cutout = photo.convert("RGBA")
-    cutout.putalpha(mask)
+    cutout.putalpha(tighten_alpha(mask))
 
     # Auf die tatsaechlich sichtbaren Pixel zuschneiden, damit im Hero-SVG
     # keine leeren Raender mitgerechnet werden.

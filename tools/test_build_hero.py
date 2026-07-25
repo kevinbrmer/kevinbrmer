@@ -92,6 +92,43 @@ def test_build_svg_embeds_portrait(theme):
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
+def test_svg_stays_transparent(theme):
+    """Kein gefuelltes Hintergrundrechteck, damit GitHubs Seitenton durchscheint."""
+    root = ET.fromstring(build_svg(theme))
+    full_width = [
+        rect
+        for rect in root.findall(f"{NS}rect")
+        if rect.attrib.get("width") == str(WIDTH)
+    ]
+    assert full_width == []
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_frame_is_outline_only(theme):
+    """Der Rahmen ist eine reine Kontur, seine Flaeche bleibt durchsichtig."""
+    root = ET.fromstring(build_svg(theme))
+    frames = [r for r in root.findall(f"{NS}rect") if "stroke" in r.attrib]
+    assert len(frames) == 1
+    assert frames[0].attrib["fill"] == "none"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_portrait_is_cut_at_the_frame_floor(theme):
+    """Das Portrait endet an der Innenkante der unteren Rahmenlinie."""
+    from build_hero import FRAME_H, FRAME_STROKE, FRAME_Y
+
+    root = ET.fromstring(build_svg(theme))
+    image = root.find(f"{NS}image")
+    assert image.attrib["clip-path"] == "url(#portraitFloor)"
+
+    rect = root.find(f".//{NS}clipPath[@id='portraitFloor']/{NS}rect")
+    expected = FRAME_Y + FRAME_H - FRAME_STROKE / 2
+    assert float(rect.attrib["height"]) == pytest.approx(expected)
+    # Ohne Beschnitt liefe das Bild tatsaechlich tiefer, sonst waere der Test blind.
+    assert float(image.attrib["y"]) + float(image.attrib["height"]) > expected
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
 def test_build_svg_has_accessible_label(theme):
     root = ET.fromstring(build_svg(theme))
     assert root.attrib["role"] == "img"

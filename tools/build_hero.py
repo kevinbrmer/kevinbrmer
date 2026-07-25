@@ -20,7 +20,7 @@ FONT_PATH = Path(
 )
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
-WIDTH, HEIGHT = 1280, 680
+WIDTH, HEIGHT = 1280, 660
 HEADLINE_SIZE = 58.0
 LINE_HEIGHT = 67.0
 TEXT_X = 64.0
@@ -34,26 +34,18 @@ TYPE_MS, HOLD_MS, ERASE_MS, PAUSE_MS = 90, 1800, 50, 380
 
 FRAME_X, FRAME_Y, FRAME_W, FRAME_H = 800.0, 150.0, 380.0, 475.0
 FRAME_RADIUS = 22.0
+FRAME_STROKE = 3.5
 PORTRAIT_SCALE = 1.15
 PORTRAIT_DROP = 29.5
 
+# Das SVG bleibt vollstaendig transparent, damit GitHub seinen eigenen
+# Seitenhintergrund durchscheinen laesst. Eine gesetzte Flaeche wuerde in
+# jedem Theme leicht neben dem Seitenton liegen und als Kasten auffallen.
 THEMES = {
-    "light": {
-        "bg": "#f6f7fc",
-        "ink": "#0a0a0a",
-        "frame": "#ffffff",
-        "shadow": "0.16",
-        # Marken-Violett aus tokens.css, Kontrast auf #f6f7fc rund 5:1
-        "accent": "#8c52ff",
-    },
-    "dark": {
-        "bg": "#0d1117",
-        "ink": "#f0f6fc",
-        "frame": "#161b22",
-        "shadow": "0.45",
-        # Aufgehelltes Violett, damit der Kontrast auf #0d1117 traegt
-        "accent": "#a482ff",
-    },
+    # Marken-Violett aus tokens.css, Kontrast auf hellem Grund rund 5:1
+    "light": {"ink": "#0a0a0a", "accent": "#8c52ff"},
+    # Aufgehelltes Violett, damit der Kontrast auf #0d1117 traegt
+    "dark": {"ink": "#f0f6fc", "accent": "#a482ff"},
 }
 
 ARIA_LABEL = (
@@ -214,16 +206,17 @@ def build_svg(theme_name: str) -> str:
     portrait_b64 = base64.b64encode((ASSETS / "portrait.png").read_bytes()).decode()
     px, py, pw, ph = _portrait_geometry()
 
+    # Das Portrait ragt oben und seitlich ueber den Rahmen hinaus, endet unten
+    # aber buendig an dessen Innenkante, statt darunter weiterzulaufen.
+    portrait_floor = FRAME_Y + FRAME_H - FRAME_STROKE / 2
+
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {WIDTH} {HEIGHT}" \
 width="{WIDTH}" height="{HEIGHT}" role="img" aria-label="{ARIA_LABEL}">
   <defs>
-    <filter id="frameShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#18214d"
-                    flood-opacity="{theme['shadow']}" />
-    </filter>
+    <clipPath id="portraitFloor">
+      <rect x="0" y="0" width="{WIDTH}" height="{portrait_floor:.2f}" />
+    </clipPath>
   </defs>
-
-  <rect width="{WIDTH}" height="{HEIGHT}" fill="{theme['bg']}" />
 
   <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {BASELINE_1:.2f})">\
 {text_to_path(font, "I help", HEADLINE_SIZE)}</g>
@@ -232,9 +225,8 @@ width="{WIDTH}" height="{HEIGHT}" role="img" aria-label="{ARIA_LABEL}">
 {_rotator_markup(font, theme)}
 
   <rect x="{FRAME_X}" y="{FRAME_Y}" width="{FRAME_W}" height="{FRAME_H}" rx="{FRAME_RADIUS}"
-        fill="{theme['frame']}" stroke="{theme['ink']}" stroke-width="3.5"
-        filter="url(#frameShadow)" />
-  <image href="data:image/png;base64,{portrait_b64}"
+        fill="none" stroke="{theme['ink']}" stroke-width="{FRAME_STROKE}" />
+  <image href="data:image/png;base64,{portrait_b64}" clip-path="url(#portraitFloor)"
          x="{px:.2f}" y="{py:.2f}" width="{pw:.2f}" height="{ph:.2f}" />
 </svg>
 """
