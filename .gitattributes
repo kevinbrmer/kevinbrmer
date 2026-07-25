@@ -1,0 +1,3 @@
+# Die Build-Skripte erzeugen nur die Assets des Profils. Ohne diese Markierung
+# meldet GitHub das Repo als "Python 100%", was fuer ein Profil-Repo in die Irre fuehrt.
+tools/* linguist-vendored
