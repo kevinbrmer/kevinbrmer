@@ -1,4 +1,3 @@
-import re
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -111,19 +110,11 @@ def test_headline_block_is_centered_on_the_portrait(theme):
     groups = [g for g in root.findall(f"{NS}g") if "transform" in g.attrib]
     baseline_y = float(groups[0].attrib["transform"].split()[-1].rstrip(")"))
 
-    from build_hero import ICON_SIZE, ICON_TOP_GAP
-
     font = load_font(FONT_PATH)
     over = text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
     under = max(text_depth(font, word, HEADLINE_SIZE) for word in WORDS)
     block_top = baseline_y - over
-    block_bottom = (
-        baseline_y
-        + len(HEADLINE_LINES) * LINE_HEIGHT
-        + under
-        + ICON_TOP_GAP
-        + ICON_SIZE
-    )
+    block_bottom = baseline_y + len(HEADLINE_LINES) * LINE_HEIGHT + under
 
     portrait_top = float(image.attrib["y"])
     portrait_bottom = min(
@@ -136,50 +127,15 @@ def test_headline_block_is_centered_on_the_portrait(theme):
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
-def test_icons_are_left_aligned_with_the_headline(theme):
-    """Alle Icons sitzen in einer Reihe, das erste buendig zur Textkante."""
-    from build_hero import ICON_GAP, ICON_NAMES, ICON_SIZE, TEXT_X
+def test_hero_carries_no_icons(theme):
+    """Die Kontakt-Icons gehoeren ins README, nicht ins SVG.
 
-    markup = build_svg(theme)
-    # Nur die Icon-Gruppen: ihr scale hat einen einzigen Faktor, waehrend die
-    # Buchstabengruppen mit "scale(x -y)" die y-Achse spiegeln.
-    xs, ys = [], []
-    for match in re.finditer(r"translate\(([\d.]+) ([\d.]+)\) scale\([\d.]+\)", markup):
-        xs.append(float(match.group(1)))
-        ys.append(float(match.group(2)))
-
-    assert len(xs) == len(ICON_NAMES)
-    assert xs[0] == pytest.approx(TEXT_X)
-    assert len(set(round(y, 2) for y in ys)) == 1
-    for left, right in zip(xs, xs[1:]):
-        assert right - left == pytest.approx(ICON_SIZE + ICON_GAP)
-
-
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_outline_icons_keep_their_fill_none(theme):
-    """Konturen-Icons brauchen das geerbte fill="none".
-
-    Fehlt es, fallen rect, circle und path auf den schwarzen Standard-Fill
-    zurueck und aus den Umrissen werden gefuellte Kloetze.
+    GitHub bindet das Hero als <img> ein und entfernt darin jeden Verweis.
+    Im SVG waeren die Icons nicht anklickbar und damit sinnlos.
     """
-    root = ET.fromstring(build_svg(theme))
-    stroked = [g for g in root.iter(f"{NS}g") if "stroke" in g.attrib]
-    assert stroked, "keine Kontur-Icons im SVG gefunden"
-    for group in stroked:
-        assert group.attrib.get("fill") == "none"
-
-
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_icons_stay_more_muted_than_the_headline(theme):
-    """Die Kontaktreihe traegt ein gedaempftes Grau, nicht die Textfarbe."""
-    from build_hero import THEMES
-
-    root = ET.fromstring(build_svg(theme))
-    stroked = [g for g in root.iter(f"{NS}g") if "stroke" in g.attrib]
-    assert stroked
-    for group in stroked:
-        assert group.attrib["stroke"] == THEMES[theme]["icon"]
-    assert THEMES[theme]["icon"] != THEMES[theme]["ink"]
+    markup = build_svg(theme)
+    for name in ("linkedin", "circle cx", "M7 9h10"):
+        assert name not in markup
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])

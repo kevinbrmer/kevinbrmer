@@ -8,7 +8,6 @@ Flaeche frei, waehrend Caret und Punkt auf derselben Zeitachse mitwandern.
 from __future__ import annotations
 
 import base64
-import re
 from pathlib import Path
 
 from PIL import Image
@@ -35,14 +34,9 @@ TEXT_X = 64.0
 HEADLINE_LINES = ["I help", "companies with"]
 CARET_WIDTH = 5.0
 
-# Die Icons werden aus assets/icons/ eingelesen, statt ihre Pfade hier zu
-# wiederholen. Alle nutzen viewBox "0 0 24 24" und die Platzhalterfarbe
-# #6a6a6a, die hier gegen die Textfarbe des Themes getauscht wird.
-ICON_NAMES = ["mail", "linkedin", "x", "web", "blog"]
-ICON_PLACEHOLDER = "#6a6a6a"
-ICON_SIZE = 34.0
-ICON_GAP = 24.0
-ICON_TOP_GAP = 46.0
+# Die Kontakt-Icons liegen bewusst NICHT im SVG, sondern als einzelne Bilder
+# im README. GitHub bindet das Hero als <img> ein und entfernt darin jeden
+# Verweis, im SVG waeren die Icons also blosse Dekoration ohne Ziel.
 CARET_GAP = 5.0
 DOT_GAP = 4.0
 
@@ -62,14 +56,11 @@ HEIGHT = round(FRAME_Y + FRAME_H + 12)
 # Das SVG bleibt vollstaendig transparent, damit GitHub seinen eigenen
 # Seitenhintergrund durchscheinen laesst. Eine gesetzte Flaeche wuerde in
 # jedem Theme leicht neben dem Seitenton liegen und als Kasten auffallen.
-# "icon" steht bewusst gedaempfter als "ink": Die Kontaktreihe soll die
-# Headline begleiten, nicht mit ihr um Aufmerksamkeit konkurrieren.
 THEMES = {
     # Marken-Violett aus tokens.css, Kontrast auf hellem Grund rund 5:1
-    "light": {"ink": "#0a0a0a", "accent": "#8c52ff", "icon": "#6a6a6a"},
-    # Aufgehelltes Violett, damit der Kontrast auf #0d1117 traegt.
-    # Das Icon-Grau entspricht GitHubs eigener Sekundaerfarbe im dunklen Theme.
-    "dark": {"ink": "#f0f6fc", "accent": "#a482ff", "icon": "#8b949e"},
+    "light": {"ink": "#0a0a0a", "accent": "#8c52ff"},
+    # Aufgehelltes Violett, damit der Kontrast auf #0d1117 traegt
+    "dark": {"ink": "#f0f6fc", "accent": "#a482ff"},
 }
 
 ARIA_LABEL = (
@@ -233,64 +224,8 @@ def first_baseline(font) -> float:
     center = (portrait_y + visible_bottom) / 2
 
     over = text_top(font, HEADLINE_LINES[0], HEADLINE_SIZE)
-    block_height = (
-        over
-        + len(HEADLINE_LINES) * LINE_HEIGHT
-        + _deepest_descender(font)
-        + ICON_TOP_GAP
-        + ICON_SIZE
-    )
+    block_height = over + len(HEADLINE_LINES) * LINE_HEIGHT + _deepest_descender(font)
     return center - block_height / 2 + over
-
-
-def icons_top(font) -> float:
-    """Obere Kante der Icon-Reihe, unterhalb der Rotator-Zeile."""
-    return (
-        first_baseline(font)
-        + len(HEADLINE_LINES) * LINE_HEIGHT
-        + _deepest_descender(font)
-        + ICON_TOP_GAP
-    )
-
-
-def _icon_parts(name: str) -> tuple[str, str]:
-    """Praesentationsattribute und Innenleben einer Icon-Datei.
-
-    Die Attribute des svg-Elements muessen mitgenommen werden. Sie tragen
-    fill="none" und die Strichbreite, die die inneren Formen erben. Ohne sie
-    faellt jede Kontur auf den schwarzen Standard-Fill zurueck.
-    """
-    markup = (ASSETS / "icons" / f"{name}.svg").read_text(encoding="utf-8")
-    head_end = markup.index(">", markup.index("<svg"))
-    head = markup[markup.index("<svg") : head_end]
-    body = markup[head_end + 1 : markup.rindex("</svg>")].strip()
-
-    attributes = dict(re.findall(r'([\w-]+)="([^"]*)"', head))
-    for ignored in ("xmlns", "viewBox", "width", "height"):
-        attributes.pop(ignored, None)
-    inherited = " ".join(f'{key}="{value}"' for key, value in attributes.items())
-    return inherited, body
-
-
-def _icons_markup(theme: dict, top: float) -> str:
-    """Icon-Reihe linksbuendig zur Headline.
-
-    Die Icons sind hier reine Grafik. Innerhalb eines als <img> eingebundenen
-    SVG traegt GitHub keine Verweise, anklickbar waeren sie nur als einzelne
-    Bilder im Markdown.
-    """
-    scale = ICON_SIZE / 24.0
-    parts = []
-    for index, name in enumerate(ICON_NAMES):
-        x = TEXT_X + index * (ICON_SIZE + ICON_GAP)
-        inherited, body = _icon_parts(name)
-        inherited = inherited.replace(ICON_PLACEHOLDER, theme["icon"])
-        body = body.replace(ICON_PLACEHOLDER, theme["icon"])
-        parts.append(
-            f'  <g transform="translate({x:.2f} {top:.2f}) scale({scale:.4f})" '
-            f"{inherited}>{body}</g>"
-        )
-    return "\n".join(parts)
 
 
 def _portrait_geometry() -> tuple[float, float, float, float]:
@@ -327,8 +262,6 @@ width="{WIDTH}" height="{HEIGHT}" role="img" aria-label="{ARIA_LABEL}">
   <g fill="{theme['ink']}" transform="translate({TEXT_X:.2f} {base + LINE_HEIGHT:.2f})">\
 {text_to_path(font, HEADLINE_LINES[1], HEADLINE_SIZE)}</g>
 {_rotator_markup(font, theme, base)}
-
-{_icons_markup(theme, icons_top(font))}
 
   <rect x="{FRAME_X}" y="{FRAME_Y}" width="{FRAME_W}" height="{FRAME_H}" rx="{FRAME_RADIUS}"
         fill="none" stroke="{theme['ink']}" stroke-width="{FRAME_STROKE}" />
